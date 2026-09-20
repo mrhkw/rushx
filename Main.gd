@@ -30,7 +30,10 @@ var races=0
 var total_distance=0.0
 var best_speed=0.0
 var achievements:Array=[]
-var settings={"graphics":2,"controls":0,"sensitivity":1.0,"music":true,"sound":true,"vibration":true}
+var settings={"graphics":2,"controls":0,"sensitivity":1.0,"music":true,"sound":true,"vibration":true,"fps_debug":false,"auto_quality":true,"resolution":"FULL HD"}
+var lap=1
+var max_laps=1
+var objective=""
 var camera_mode=0
 var rng=RandomNumberGenerator.new()
 
@@ -58,7 +61,7 @@ var cars=[
 func _ready():
 	rng.randomize()
 	inputs()
-	show_loading("Starting RUSHX…")
+	show_loading("Starting RUSHX…",10)
 	call_deferred("_boot_game")
 
 func _boot_game():
@@ -67,7 +70,7 @@ func _boot_game():
 	apply_graphics_settings()
 	menu()
 
-func show_loading(message:String):
+func show_loading(message:String, progress:float=0.0):
 	if ui==null:
 		ui=CanvasLayer.new()
 		add_child(ui)
@@ -90,7 +93,7 @@ func show_loading(message:String):
 	boxc.add_child(msg)
 	var bar:=ProgressBar.new()
 	bar.custom_minimum_size=Vector2(520,18)
-	bar.value=35
+	bar.value=progress
 	bar.show_percentage=false
 	boxc.add_child(bar)
 
@@ -126,7 +129,23 @@ func data(id:int)->Dictionary:
 	if id==100:typ="Final Championship"
 	var weather=["Sunny","Cloudy","Rain","Heavy Rain","Fog","Storm"][(id*3+local)%6]
 	var time=["Morning","Noon","Afternoon","Sunset","Night"][(id+w)%5]
-	return {"id":id,"w":w,"local":local,"name":names[id-1],"type":typ,"weather":weather,"time":time,"length":850+local*95+w*70,"opp":3+min(6,int(w/2)),"reward":300+id*85,"xp":150+id*45,"target":70+id*1.1,"laps":2 if typ in ["Circuit Race","Multi-lap Race","Final Championship"] else 1}
+	return {"id":id,"w":w,"local":local,"name":names[id-1],"type":typ,"weather":weather,"time":time,"length":850+local*95+w*70,"opp":3+min(6,int(w/2)),"reward":300+id*85,"xp":150+id*45,"target":70+id*1.1,"laps":3 if id==100 else (2 if typ in ["Circuit Race","Multi-lap Race","Final Championship"] else 1),"objective":objective_for(id,typ)}
+
+func objective_for(id:int,typ:String)->String:
+	if id==100:return "Complete the Ultimate Championship"
+	match typ:
+		"Time Trial": return "Beat the target time"
+		"Drift Challenge": return "Finish with a clean drift run"
+		"Overtake Challenge": return "Finish while overtaking traffic"
+		"Speed Challenge": return "Reach the required top speed"
+		"Nitro Challenge": return "Use Nitro strategically and finish"
+		"Boss Race": return "Defeat the world boss"
+	return "Reach the finish and beat the opponents"
+
+func update_fps(dt):
+	if not settings.get("fps_debug",false): return
+	if ui and ui.has_meta("fps"):
+		ui.get_meta("fps").text="FPS %.0f | Objects %d"%[Engine.get_frames_per_second(),get_tree().get_node_count()]
 
 func menu():
 	state="menu";clear_ui()
@@ -204,6 +223,8 @@ func settings_menu():
 	b=button("MUSIC: "+("ON" if settings.music else "OFF"));b.pressed.connect(func():settings.music=not settings.music;save_game();settings_menu());v.add_child(b)
 	b=button("SOUND: "+("ON" if settings.sound else "OFF"));b.pressed.connect(func():settings.sound=not settings.sound;save_game();settings_menu());v.add_child(b)
 	b=button("VIBRATION: "+("ON" if settings.vibration else "OFF"));b.pressed.connect(func():settings.vibration=not settings.vibration;save_game();settings_menu());v.add_child(b)
+	b=button("AUTO QUALITY: "+("ON" if settings.auto_quality else "OFF"));b.pressed.connect(func():settings.auto_quality=not settings.auto_quality;save_game();settings_menu());v.add_child(b)
+	b=button("FPS DEBUG: "+("ON" if settings.fps_debug else "OFF"));b.pressed.connect(func():settings.fps_debug=not settings.fps_debug;save_game();settings_menu());v.add_child(b)
 	b=button("BACK");b.pressed.connect(menu);v.add_child(b)
 
 func car(id:int,pos:Vector3,small:=false):
@@ -216,7 +237,13 @@ func car(id:int,pos:Vector3,small:=false):
 	return n
 
 func build_world(d):
-	var env:=WorldEnvironment.new();var e:=Environment.new();e.background_mode=Environment.BG_COLOR;e.background_color=world_colors[d.w].darkened(.78);e.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;e.ambient_light_color=world_colors[d.w];e.ambient_light_energy=.9;env.environment=e;add_child(env);world_nodes.append(env)
+	var env:=WorldEnvironment.new();var e:=Environment.new();e.background_mode=Environment.BG_COLOR;e.background_color=world_colors[d.w].darkened(.78);e.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;e.ambient_light_color=world_colors[d.w];e.ambient_light_energy=.9
+	if d.weather in ["Fog","Storm"]:
+		e.fog_enabled=true
+		e.fog_light_color=world_colors[d.w]
+		e.fog_density=.008 if d.weather=="Fog" else .004
+	if d.time=="Night": e.ambient_light_energy=.38
+	env.environment=e;add_child(env);world_nodes.append(env)
 	var sun:=DirectionalLight3D.new();sun.rotation_degrees=Vector3(-52,-35,0);sun.light_energy=.6 if d.time=="Night" else 1.2;sun.shadow_enabled=settings.graphics>=1;add_child(sun);world_nodes.append(sun)
 	var segments=int(d.length/22);route.clear()
 	for i in range(segments+1):
@@ -255,11 +282,11 @@ func start_race():
 		return
 	state="loading"
 	paused=false
-	show_loading("Loading Level %d…" % level)
+	show_loading("Loading Level %d…" % level,20)
 	await get_tree().process_frame
 	var d=data(level)
 	_clear_world()
-	show_loading("Building %s…" % d.name)
+	show_loading("Building %s…" % d.name,55)
 	await get_tree().process_frame
 	build_world(d)
 	await get_tree().process_frame
@@ -272,15 +299,22 @@ func start_race():
 	cam.current=true
 	spawn_ai(d)
 	spawn_traffic(d)
+	show_loading("Preparing physics, AI and traffic…",82)
 	await get_tree().process_frame
 	state="race"
 	countdown=3.0
 	timer=0.0
+	lap=1
+	max_laps=int(d.laps)
+	objective=d.objective
+	checkpoint=0
 	speed=0.0
 	nitro=100.0
 	damage=0.0
 	checkpoint=0
 	render_environment_quality()
+	show_loading("Race ready!",100)
+	await get_tree().create_timer(0.12).timeout
 	race_ui(d)
 
 func _clear_world():
@@ -344,7 +378,9 @@ func race_ui(d):
 	var a=label("WORLD %d • LEVEL %d\n%s"%(d.w+1,d.id,d.name),20);a.position=Vector2(20,15);h.add_child(a)
 	var s=label("SPEED 000 KM/H\nRPM 0",22);s.position=Vector2(20,75);h.add_child(s);ui.set_meta("speed",s)
 	var n=label("NITRO 100%",20);n.position=Vector2(1030,20);h.add_child(n);ui.set_meta("nitro",n)
-	var o=label("POSITION 1/%d\n%s\n%s • %s"%(d.opp+1,d.type,d.weather,d.time),18);o.position=Vector2(990,70);h.add_child(o);ui.set_meta("obj",o)
+	var o=label("POSITION 1/%d\n%s\n%s • %s\nOBJECTIVE: %s"%(d.opp+1,d.type,d.weather,d.time,d.objective),18);o.position=Vector2(900,70);o.custom_minimum_size=Vector2(360,130);h.add_child(o);ui.set_meta("obj",o)
+	var cp=label("CHECKPOINT 0/%d\nLAP 1/%d"%(checkpoints.size(),max_laps),18);cp.position=Vector2(20,150);h.add_child(cp);ui.set_meta("cp",cp)
+	var fps=label("",14);fps.position=Vector2(20,185);h.add_child(fps);ui.set_meta("fps",fps);fps.visible=settings.get("fps_debug",false)
 	var c=label("",72);c.set_anchors_and_offsets_preset(Control.PRESET_CENTER);c.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;h.add_child(c);ui.set_meta("count",c)
 	var pause=button("Ⅱ",55);pause.position=Vector2(1180,15);pause.pressed.connect(pause_game);h.add_child(pause)
 	var l=button("◀",90);l.position=Vector2(20,620);l.button_down.connect(func():Input.action_press("left"));l.button_up.connect(func():Input.action_release("left"));h.add_child(l)
@@ -388,8 +424,13 @@ func _physics_process(dt):
 	var near=nearest(player.position);player.position.x=lerp(player.position.x,near.x,.12*dt*10)
 	total_distance+=abs(speed)*dt;best_speed=max(best_speed,abs(speed)*4)
 	var d=data(level)
-	update_ai(dt);update_traffic(dt);update_camera(dt);update_hud(d,boost)
-	if player.position.distance_to(route.back())<10:finish_race(d)
+	update_ai(dt);update_traffic(dt);update_camera(dt);update_hud(d,boost);update_fps(dt)
+	if checkpoint<checkpoints.size() and player.position.distance_to(checkpoints[checkpoint])<14:
+		checkpoint+=1
+		if checkpoint>=checkpoints.size() and lap<max_laps:
+			lap+=1
+			checkpoint=0
+	if player.position.distance_to(route.back())<10 and checkpoint>=checkpoints.size():finish_race(d)
 
 func nearest(p):
 	var best=route[0];var bd=INF
@@ -419,7 +460,8 @@ func update_hud(d,boost):
 	var pos=1
 	for q in ai:
 		if q.progress>abs(player.position.z-route[0].z):pos+=1
-	ui.get_meta("obj").text="POSITION %d/%d\n%s\n%s • %s\nTIME %.1f"%[pos,d.opp+1,d.type,d.weather,d.time,timer]
+	ui.get_meta("obj").text="POSITION %d/%d\n%s\n%s • %s\nOBJECTIVE: %s\nTIME %.1f"%[pos,d.opp+1,d.type,d.weather,d.time,d.objective,timer]
+	ui.get_meta("cp").text="CHECKPOINT %d/%d\nLAP %d/%d"%[checkpoint,checkpoints.size(),lap,max_laps]
 
 func finish_race(d):
 	state="results";var pos=1
@@ -436,6 +478,9 @@ func finish_race(d):
 	if level>=100 and not achievements.has("100 Levels"):achievements.append("100 Levels")
 	if best_speed>=250 and not achievements.has("Speed Demon"):achievements.append("Speed Demon")
 	if level==100 and not achievements.has("Champion"):achievements.append("Champion")
+	if st==3 and not achievements.has("Perfect Race"):achievements.append("Perfect Race")
+	if damage<=0.1 and not achievements.has("No Crash"):achievements.append("No Crash")
+	if level==100 and not owned.has(14):owned.append(14)
 	save_game();results(pos,st,d)
 
 func results(pos,st,d):
