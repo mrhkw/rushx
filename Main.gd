@@ -370,16 +370,16 @@ func spawn_ai(d):
 
 func spawn_traffic(d):
 	traffic.clear()
-	for i in range(8+d.w*2+d.local/3):
+	for i in range(int(8+d.w*2+d.local/3)):
 		var n=car((i+d.w)%15,Vector3([-6,-2,2,6][i%4],.7,-40-i*65),true);traffic.append({"n":n,"speed":15+(i%5)*2.0,"lane":[-6,-2,2,6][i%4],"phase":i})
 
 func race_ui(d):
 	clear_ui();var h:=Control.new();h.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);ui.add_child(h)
-	var a=label("WORLD %d • LEVEL %d\n%s"%(d.w+1,d.id,d.name),20);a.position=Vector2(20,15);h.add_child(a)
+	var a=label("WORLD %d • LEVEL %d\n%s" % [d.w+1,d.id,d.name],20);a.position=Vector2(20,15);h.add_child(a)
 	var s=label("SPEED 000 KM/H\nRPM 0",22);s.position=Vector2(20,75);h.add_child(s);ui.set_meta("speed",s)
 	var n=label("NITRO 100%",20);n.position=Vector2(1030,20);h.add_child(n);ui.set_meta("nitro",n)
-	var o=label("POSITION 1/%d\n%s\n%s • %s\nOBJECTIVE: %s"%(d.opp+1,d.type,d.weather,d.time,d.objective),18);o.position=Vector2(900,70);o.custom_minimum_size=Vector2(360,130);h.add_child(o);ui.set_meta("obj",o)
-	var cp=label("CHECKPOINT 0/%d\nLAP 1/%d"%(checkpoints.size(),max_laps),18);cp.position=Vector2(20,150);h.add_child(cp);ui.set_meta("cp",cp)
+	var o=label("POSITION 1/%d\n%s\n%s • %s\nOBJECTIVE: %s" % [d.opp+1,d.type,d.weather,d.time,d.objective],18);o.position=Vector2(900,70);o.custom_minimum_size=Vector2(360,130);h.add_child(o);ui.set_meta("obj",o)
+	var cp=label("CHECKPOINT 0/%d\nLAP 1/%d" % [checkpoints.size(),max_laps],18);cp.position=Vector2(20,150);h.add_child(cp);ui.set_meta("cp",cp)
 	var fps=label("",14);fps.position=Vector2(20,185);h.add_child(fps);ui.set_meta("fps",fps);fps.visible=settings.get("fps_debug",false)
 	var c=label("",72);c.set_anchors_and_offsets_preset(Control.PRESET_CENTER);c.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;h.add_child(c);ui.set_meta("count",c)
 	var pause=button("Ⅱ",55);pause.position=Vector2(1180,15);pause.pressed.connect(pause_game);h.add_child(pause)
