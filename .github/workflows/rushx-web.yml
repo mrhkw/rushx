@@ -21,6 +21,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate GDScript
+        run: |
+          GODOT="/home/runner/.local/share/godot/godot_executable/Godot_v4.6-stable_linux.x86_64"
+          "$GODOT" --headless --path . --check-only --script Main.gd
+
       - name: Export RUSHX Web
         id: export
         uses: firebelley/godot-export@v7.0.0
