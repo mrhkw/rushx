@@ -126,11 +126,17 @@ func garage():
 	var b=button("NEXT CAR");b.pressed.connect(func():car_id=(car_id+1)%15;garage());v.add_child(b)
 	b=button("UPGRADE PARTS");b.pressed.connect(upgrades_menu);v.add_child(b);b=button("BACK");b.pressed.connect(menu);v.add_child(b)
 
+func _select_car(n:int):
+	car_id=n
+	if not owned.has(n):owned.append(n)
+	save_game()
+	garage()
+
 func cars_menu():
 	clear_ui();var v:=VBoxContainer.new();v.position=Vector2(20,15);ui.add_child(v);v.add_child(label("CARS • 15 UNIQUE",34))
 	for i in range(15):
 		var ok=i==0 or total_stars()>=i*4;var b=button("%02d %s • %.0f KM/H • %s"%[i+1,cars[i].n,cars[i].s,"UNLOCKED" if ok else "LOCKED"],650);b.disabled=not ok
-		if ok:b.pressed.connect(func(n=i):car_id=n;if not owned.has(n):owned.append(n);save_game();garage())
+		if ok:b.pressed.connect(func():_select_car(i))
 		v.add_child(b)
 	var back=button("BACK");back.pressed.connect(menu);v.add_child(back)
 
@@ -240,9 +246,13 @@ func pause_game():
 	paused=not paused
 	if paused:
 		clear_ui();var v:=VBoxContainer.new();v.position=Vector2(400,180);ui.add_child(v);v.add_child(label("PAUSED",44))
-		for q in [["RESUME",func():paused=false;race_ui(data(level))],["RESTART",start_race],["SETTINGS",settings_menu],["QUIT RACE",world_map]]:
+		for q in [["RESUME",Callable(self,"resume_race")],["RESTART",Callable(self,"start_race")],["SETTINGS",Callable(self,"settings_menu")],["QUIT RACE",Callable(self,"world_map")]]:
 			var b=button(q[0]);b.pressed.connect(q[1]);v.add_child(b)
 	else:race_ui(data(level))
+
+func resume_race():
+	paused=false
+	race_ui(data(level))
 
 func _physics_process(dt):
 	if state!="race" or player==null or paused:return
@@ -265,7 +275,8 @@ func _physics_process(dt):
 	player.rotation.y-=steer*turn*dt*(.7+speed/60.0);player.velocity=Vector3.FORWARD.rotated(Vector3.UP,player.rotation.y)*speed;player.move_and_slide();player.position.y=.72
 	var near=nearest(player.position);player.position.x=lerp(player.position.x,near.x,.12*dt*10)
 	total_distance+=abs(speed)*dt;best_speed=max(best_speed,abs(speed)*4)
-	update_ai(dt);update_traffic(dt);update_camera(dt);update_hud(d:=data(level),boost)
+	var d=data(level)
+	update_ai(dt);update_traffic(dt);update_camera(dt);update_hud(d,boost)
 	if player.position.distance_to(route.back())<10:finish_race(d)
 
 func nearest(p):
