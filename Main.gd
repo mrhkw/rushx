@@ -85,10 +85,10 @@ func show_loading(message:String, progress:float=0.0):
 	boxc.position=Vector2(-260,-75)
 	boxc.add_theme_constant_override("separation",12)
 	ui.add_child(boxc)
-	var title:=label("RUSHX",52)
+	var title:Label=label("RUSHX",52)
 	title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	boxc.add_child(title)
-	var msg:=label(message,20)
+	var msg:Label=label(message,20)
 	msg.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	boxc.add_child(msg)
 	var bar:=ProgressBar.new()
@@ -338,16 +338,16 @@ func show_load_error(message:String):
 	v.custom_minimum_size=Vector2(520,180)
 	v.add_theme_constant_override("separation",10)
 	ui.add_child(v)
-	var title:=label("GAME LOAD ERROR",32)
+	var title:Label=label("GAME LOAD ERROR",32)
 	title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
-	var msg:=label(message,18)
+	var msg:Label=label(message,18)
 	msg.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(msg)
-	var retry:=button("RETRY")
+	var retry:Button=button("RETRY")
 	retry.pressed.connect(start_race)
 	v.add_child(retry)
-	var back:=button("MAIN MENU")
+	var back:Button=button("MAIN MENU")
 	back.pressed.connect(menu)
 	v.add_child(back)
 
