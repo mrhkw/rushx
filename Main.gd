@@ -56,7 +56,43 @@ var cars=[
 {"n":"RUSHX ONE","s":285.0,"a":11.0,"h":9.7,"b":10.0,"g":9.8,"d":9.8,"c":Color("#f4f4f4")}]
 
 func _ready():
-	rng.randomize(); load_game(); inputs(); menu()
+	rng.randomize()
+	inputs()
+	show_loading("Starting RUSHX…")
+	call_deferred("_boot_game")
+
+func _boot_game():
+	await get_tree().process_frame
+	load_game()
+	apply_graphics_settings()
+	menu()
+
+func show_loading(message:String):
+	if ui==null:
+		ui=CanvasLayer.new()
+		add_child(ui)
+	for x in ui.get_children(): x.queue_free()
+	var bg:=ColorRect.new()
+	bg.color=Color("#05070d")
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ui.add_child(bg)
+	var boxc:=VBoxContainer.new()
+	boxc.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	boxc.custom_minimum_size=Vector2(520,150)
+	boxc.position=Vector2(-260,-75)
+	boxc.add_theme_constant_override("separation",12)
+	ui.add_child(boxc)
+	var title:=label("RUSHX",52)
+	title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	boxc.add_child(title)
+	var msg:=label(message,20)
+	msg.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	boxc.add_child(msg)
+	var bar:=ProgressBar.new()
+	bar.custom_minimum_size=Vector2(520,18)
+	bar.value=35
+	bar.show_percentage=false
+	boxc.add_child(bar)
 
 func inputs():
 	for x in [["accel",KEY_W],["accel",KEY_UP],["brake",KEY_S],["brake",KEY_DOWN],["left",KEY_A],["left",KEY_LEFT],["right",KEY_D],["right",KEY_RIGHT],["hand",KEY_SPACE],["nitro",KEY_SHIFT],["camera",KEY_C],["pause",KEY_ESCAPE],["restart",KEY_R]]:
@@ -215,7 +251,83 @@ func detail(d,pos,i):
 		9: box(self,p+Vector3(0,4,0),Vector3(10,8,10),Color("#5a5d66"))
 
 func start_race():
-	var d=data(level);state="race";paused=false;timer=0;countdown=3;speed=0;nitro=100;damage=0;checkpoint=0;_clear_world();build_world(d);player=car(car_id,route[0]+Vector3(0,.7,10));cam=Camera3D.new();add_child(cam);cam.current=true;spawn_ai(d);spawn_traffic(d);race_ui(d)
+	if state=="loading":
+		return
+	state="loading"
+	paused=false
+	show_loading("Loading Level %d…" % level)
+	await get_tree().process_frame
+	var d=data(level)
+	_clear_world()
+	show_loading("Building %s…" % d.name)
+	await get_tree().process_frame
+	build_world(d)
+	await get_tree().process_frame
+	if route.is_empty():
+		show_load_error("Track generation failed. The game was protected from a black screen.")
+		return
+	player=car(car_id,route[0]+Vector3(0,.7,10))
+	cam=Camera3D.new()
+	add_child(cam)
+	cam.current=true
+	spawn_ai(d)
+	spawn_traffic(d)
+	await get_tree().process_frame
+	state="race"
+	countdown=3.0
+	timer=0.0
+	speed=0.0
+	nitro=100.0
+	damage=0.0
+	checkpoint=0
+	render_environment_quality()
+	race_ui(d)
+
+func _clear_world():
+	for n in world_nodes:
+		if is_instance_valid(n):
+			n.free()
+	world_nodes.clear()
+	ai.clear()
+	traffic.clear()
+	route.clear()
+	checkpoints.clear()
+	player=null
+	cam=null
+
+func show_load_error(message:String):
+	state="error"
+	clear_ui()
+	var v:=VBoxContainer.new()
+	v.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	v.position=Vector2(-260,-90)
+	v.custom_minimum_size=Vector2(520,180)
+	v.add_theme_constant_override("separation",10)
+	ui.add_child(v)
+	var title:=label("GAME LOAD ERROR",32)
+	title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(title)
+	var msg:=label(message,18)
+	msg.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(msg)
+	var retry:=button("RETRY")
+	retry.pressed.connect(start_race)
+	v.add_child(retry)
+	var back:=button("MAIN MENU")
+	back.pressed.connect(menu)
+	v.add_child(back)
+
+func apply_graphics_settings():
+	var quality=int(settings.get("graphics",2))
+	var scale=[0.70,0.82,0.94,1.0][clamp(quality,0,3)]
+	get_viewport().scaling_3d_scale=scale
+
+func render_environment_quality():
+	var quality=int(settings.get("graphics",2))
+	var shadow=quality>=1
+	for n in world_nodes:
+		if n is DirectionalLight3D:
+			n.shadow_enabled=shadow
 
 func spawn_ai(d):
 	ai.clear()
