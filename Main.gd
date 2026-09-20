@@ -98,7 +98,7 @@ func _build_car():
     car = _make_car(self, Color(0.08,0.5,1.0), Vector3(0,0.65,60))
     var cam := Camera3D.new()
     cam.position = Vector3(0, 3.8, 8.5)
-    cam.rotation_degrees = Vector3(-12,180,0)
+    cam.rotation_degrees = Vector3(-12,0,0)
     car.add_child(cam)
     cam.current = true
 
