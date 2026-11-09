@@ -5,3 +5,10 @@ export_presets.cfg
 *.tmp
 *.log
 .DS_Store
+.android-sdk/
+.tools/
+android/.gradle/
+android/build/
+android/app/build/
+*.keystore
+*.jks
