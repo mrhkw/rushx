@@ -12,3 +12,5 @@ android/build/
 android/app/build/
 *.keystore
 *.jks
+artifacts/
+hkw-wifi.apk
